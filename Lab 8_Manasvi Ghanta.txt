@@ -1,0 +1,92 @@
+#install.packages("mlbench")
+library(mlbench)
+Diab_Data <-data(PimaIndiansDiabetes)
+Diab_Data_Frame <-data.frame(PimaIndiansDiabetes)
+
+#investigate missing values
+idx <- which( is.na(Diab_Data_Frame), arr.ind=TRUE )
+miss <- Diab_Data_Frame[idx[,1],]
+table(miss$diabetes)
+
+#Diab_Data_Frame$diabetes[ Diab_Data_Frame$diabetes == 0 ] <- 2
+
+model_age <- lm(age ~ ., data = Diab_Data_Frame)
+summary(model_age)
+
+model_pregnant <- lm(pregnant ~ ., data = Diab_Data_Frame)
+summary(model_pregnant)
+
+model_glucose <- lm(glucose ~ ., data = Diab_Data_Frame)
+summary(model_glucose)
+
+model_pressure <- lm(pressure ~ ., data = Diab_Data_Frame)
+summary(model_pressure)
+
+model_triceps <- lm(triceps ~ ., data = Diab_Data_Frame)
+summary(model_triceps)
+
+model_insulin <- lm(insulin ~ ., data = Diab_Data_Frame)
+summary(model_insulin)
+
+model_mass <- lm(mass ~ ., data = Diab_Data_Frame)
+summary(model_mass)
+
+model_pedigree <- lm(pedigree ~ ., data = Diab_Data_Frame)
+summary(model_pedigree)
+
+# fit the glm using binomial family 
+modfit <- glm( diabetes ~ . , data=Diab_Data_Frame, family=binomial(link = "logit") ) 
+summary(modfit)
+
+coef(modfit) #positive = more likely, negative = less likely
+#odds
+#greater than 1 = more likely, less than 1 = less likely. 2 = twice as likely. 0.5, half as likely
+t <- exp(coef(modfit)) 
+format(t, scientific=FALSE)
+
+predmod <- predict(modfit, type="response")
+head(predmod)
+
+
+
+#Install and load ROCR package
+#install.packages("ROCR")
+library(ROCR)
+#ROC and Performance function
+ROCRpred <- prediction(predmod, Diab_Data_Frame$diabetes)
+ROCRperf <- performance(ROCRpred, "tpr", "fpr")
+#what AUC do we get?
+# An AUC of 1 represents is a perfect model an an AUC of 0.5 represents model failure, worse than random guessing
+AUC <-performance(ROCRpred, "auc")
+AUC@y.values
+#Plot ROC curve
+plot(ROCRperf)
+plot(ROCRperf, colorize=TRUE)
+plot(ROCRperf, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.3,0.3), xlim = c(0, 1))
+
+# find minimum alpha value at threshold of 0.1
+cutoffPoint <- which.min( abs(ROCRperf@alpha.values[[1]]-0.2 ) )
+cutoffPoint
+
+dataframe_pred <- data.frame(predmod)
+# name the column
+colnames(dataframe_pred)<- c("Probability")
+dataframe_pred[,"Prediction"] <- NA
+
+for (i in 1:nrow(dataframe_pred)){
+  if (dataframe_pred[i,]$Probability>=0.2){
+    dataframe_pred[i,2]<-"Yes"
+  } else
+    dataframe_pred[i,2]<-"No"
+}
+table <- table(dataframe_pred$Prediction,Diab_Data_Frame$diabetes)
+table
+
+# construct data frame of this alpha 
+testDF <- data.frame(cutoff = ROCRperf@alpha.values[[1]][cutoffPoint],
+                     fpr = ROCRperf@x.values[[1]][cutoffPoint],
+                     tpr = ROCRperf@y.values[[1]][cutoffPoint])
+testDF
+
+
+

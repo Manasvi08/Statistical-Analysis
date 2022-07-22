@@ -1,0 +1,192 @@
+#install.packages("mlbench")
+#install.packages("arm")
+#install.packages("lmtest")
+#install.packages("ROCR")
+
+library(ROCR)
+library(mlbench)
+library(arm)
+library(lmtest)
+
+Diab_Data <-data(PimaIndiansDiabetes)
+Diab_Data_Frame <-PimaIndiansDiabetes
+
+#---------------------------------------------------------------------------------------------
+
+# model fit for the original dataset
+modfit <- glm( diabetes ~ . , data=Diab_Data_Frame, family=binomial(link = "logit") ) 
+summary(modfit)
+
+#binned plot for assessing the residuals
+y<-resid(modfit)
+predmod <- predict(modfit, type="response")
+binnedplot(predmod,y,nclass=NULL, 
+              xlab="Expected Values", ylab="Average residual", 
+              main="Binned residual plot", 
+              cex.pts=0.8, col.pts=1, col.int="red")
+
+
+coef(modfit)
+t <- exp(coef(modfit)) 
+format(t, scientific=FALSE)
+
+#ROCR curve
+
+ROCRpred <- prediction(predmod, Diab_Data_Frame$diabetes)
+ROCRperf <- performance(ROCRpred, "tpr", "fpr")
+AUC <-performance(ROCRpred, "auc")
+AUC@y.values
+plot(ROCRperf)
+plot(ROCRperf, colorize=TRUE)
+plot(ROCRperf, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.3,0.3), xlim = c(0, 1))
+
+cutoffPoint <- which.min( abs(ROCRperf@alpha.values[[1]]-0.2 ) )
+cutoffPoint
+
+dataframe_pred <- data.frame(predmod)
+colnames(dataframe_pred)<- c("Probability")
+dataframe_pred[,"Prediction"] <- NA
+
+for (i in 1:nrow(dataframe_pred)){
+  if (dataframe_pred[i,]$Probability>=0.2){
+    dataframe_pred[i,2]<-"Yes"
+  } else
+    dataframe_pred[i,2]<-"No"
+}
+table <- table(dataframe_pred$Prediction,Diab_Data_Frame$diabetes)
+table
+
+testDF <- data.frame(cutoff = ROCRperf@alpha.values[[1]][cutoffPoint],
+                     fpr = ROCRperf@x.values[[1]][cutoffPoint],
+                     tpr = ROCRperf@y.values[[1]][cutoffPoint])
+testDF
+
+plot(modfit) # Just inorder to see different residual plots to check the assumptions of the resiudals in a regression line.
+
+levels(Diab_Data_Frame$diabetes) <-c(0, 1)
+
+library(caret)
+class.glm <- as.factor(ifelse(predmod <= 0.2, 0, 1 ))
+confusionMatrix(class.glm, as.factor(Diab_Data_Frame$diabetes), positive = "0")
+
+#-------------------------------------------------------------------------------------------------------------------------------
+# checking the missing values from the dataset
+idx <- which( is.na(Diab_Data_Frame), arr.ind=TRUE )
+miss <- Diab_Data_Frame[idx[,1],]
+table(miss$diabetes)
+
+#plotting box plots to check how different variables have their role in predicting the diabetes in the datset
+
+plot(Diab_Data_Frame$diabetes,Diab_Data_Frame$pressure)
+plot(Diab_Data_Frame$diabetes,Diab_Data_Frame$age)
+plot(Diab_Data_Frame$diabetes,Diab_Data_Frame$insulin)
+plot(Diab_Data_Frame$diabetes,Diab_Data_Frame$mass)
+plot(Diab_Data_Frame$diabetes,Diab_Data_Frame$triceps)
+plot(Diab_Data_Frame$diabetes,Diab_Data_Frame$pedigree)
+plot(Diab_Data_Frame$diabetes,Diab_Data_Frame$glucose)
+plot(Diab_Data_Frame$diabetes,Diab_Data_Frame$pregnant)
+
+#----------------------------------------------------------------------------------------------
+
+#fitting a model with all the first order interactions 
+modfit2 <- glm( diabetes ~.+.^2  ,data=Diab_Data_Frame, family=binomial(link = "logit") ) 
+summary(modfit2)
+
+predmod2 <- predict(modfit2, type="response")
+
+y2<-resid(modfit2)
+binnedplot(predmod2,y2,nclass=NULL, 
+           xlab="Expected Values", ylab="Average residual", 
+           main="Binned residual plot", 
+           cex.pts=0.8, col.pts=1, col.int="blue")
+
+
+library(caret)
+class.glm2 <- as.factor(ifelse(predmod2 <= 0.2, 0, 1 ))
+confusionMatrix(class.glm2, as.factor(Diab_Data_Frame$diabetes), positive = "0")
+
+coef(modfit2)
+t2 <- exp(coef(modfit2)) 
+format(t2, scientific=FALSE)
+
+ROCRpred2 <- prediction(predmod2, Diab_Data_Frame$diabetes)
+ROCRperf2 <- performance(ROCRpred2, "tpr", "fpr")
+AUC2 <-performance(ROCRpred2, "auc")
+AUC2@y.values
+plot(ROCRperf2)
+plot(ROCRperf2, colorize=TRUE)
+plot(ROCRperf2, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.3,0.3), xlim = c(0, 1))
+
+cutoffPoint2 <- which.min( abs(ROCRperf2@alpha.values[[1]]-0.2 ) )
+cutoffPoint2
+
+dataframe_pred2 <- data.frame(predmod2)
+colnames(dataframe_pred2)<- c("Probability")
+dataframe_pred2[,"Prediction"] <- NA
+
+for (i in 1:nrow(dataframe_pred2)){
+  if (dataframe_pred2[i,]$Probability>=0.2){
+    dataframe_pred2[i,2]<-"Yes"
+  } else
+    dataframe_pred2[i,2]<-"No"
+}
+table2 <- table(dataframe_pred2$Prediction,Diab_Data_Frame$diabetes)
+table2
+
+testDF2 <- data.frame(cutoff = ROCRperf2@alpha.values[[1]][cutoffPoint2],
+                      fpr = ROCRperf2@x.values[[1]][cutoffPoint2],
+                      tpr = ROCRperf2@y.values[[1]][cutoffPoint2])
+testDF2
+
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# fitted regression model that I chose
+modfit1 <- glm( diabetes ~pregnant+glucose+pressure+pedigree+mass+pregnant*age+triceps*pedigree+pressure*age+insulin*pedigree  ,data=Diab_Data_Frame, family=binomial(link = "logit") ) 
+summary(modfit1)
+
+predmod1 <- predict(modfit1, type="response")
+
+library(caret)
+class.glm1 <- as.factor(ifelse(predmod1 <= 0.2, 0, 1 ))
+confusionMatrix(class.glm1, as.factor(Diab_Data_Frame$diabetes), positive = "0")
+
+y1<-resid(modfit1)
+binnedplot(predmod1,y1,nclass=NULL, 
+           xlab="Expected Values", ylab="Average residual", 
+           main="Binned residual plot", 
+           cex.pts=0.8, col.pts=1, col.int="blue")
+
+coef(modfit1)
+t1 <- exp(coef(modfit1)) 
+format(t1, scientific=FALSE)
+
+ROCRpred1 <- prediction(predmod1, Diab_Data_Frame$diabetes)
+ROCRperf1 <- performance(ROCRpred1, "tpr", "fpr")
+AUC1 <-performance(ROCRpred1, "auc")
+AUC1@y.values
+plot(ROCRperf1)
+plot(ROCRperf1, colorize=TRUE)
+plot(ROCRperf1, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.3,0.3), xlim = c(0, 1))
+
+cutoffPoint1 <- which.min( abs(ROCRperf1@alpha.values[[1]]-0.2 ) )
+cutoffPoint1
+
+dataframe_pred1 <- data.frame(predmod1)
+colnames(dataframe_pred1)<- c("Probability")
+dataframe_pred1[,"Prediction"] <- NA
+
+testDF1 <- data.frame(cutoff = ROCRperf1@alpha.values[[1]][cutoffPoint1],
+                     fpr = ROCRperf1@x.values[[1]][cutoffPoint1],
+                     tpr = ROCRperf1@y.values[[1]][cutoffPoint1])
+testDF1
+
+#-----------------------------------------------------------------------------------------------------------------
+
+#likelihood ratio tests for assesing the models overall
+lrtest(modfit,modfit1)
+lrtest(modfit,modfit2)
+lrtest(modfit2,modfit1)
+
+#---------------------------------------------------------------------------------------------------------------------
+
+

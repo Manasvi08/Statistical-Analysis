@@ -1,0 +1,56 @@
+#Reading the dataset
+X <- read.table( "breast_cancer.dat", sep=",", header=T, na.strings="?" )
+
+# changing the levels of benign and malignant to 0 and 1 respectively
+X$class_tumor[ X$class_tumor == 2 ] <- 0
+X$class_tumor[ X$class_tumor == 4 ] <- 1
+
+
+# investigating missing values
+idx <- which( is.na(X), arr.ind=TRUE )
+miss <- X[idx[,1],]
+table(miss$class_tumor)
+
+# removing the sample id number
+X <- X[-idx[,1],]\
+# creating a datframe without the id_number
+Y <- X[,-1]
+# creating a datframe without the classification
+Z <- subset(Y, select = -c(class_tumor))
+
+
+install.packages("data.table")
+library(data.table)
+W <- Y
+setDT(W)
+
+W[, lapply(.SD, median), by = class_tumor]  
+
+#frequencies by group
+apply(Y, 2, function(z) ftable(z,Y$class_tumor))
+
+#For Fig1
+
+par(mfrow=c(3,3))
+sink("NUL")    # now suppresses
+apply(Z, 2, function(z) boxplot(z~Y$class_tumor))
+sink() 
+
+mylist <- names(Z)
+for (i in 1:length(mylist)){ 
+  x <- Z[,i]
+  name <- mylist[i]
+  boxplot(x~Y$class_tumor, main=name, xlab= "", ylab="", names=c("Benign","Malignant"))
+}
+ 
+#For fig 2
+res <- cor(Z)
+round(res, 2)
+
+install.packages("corrplot")
+library(corrplot)
+corrplot(res,diag = TRUE,outline = TRUE,tl.col = "black", tl.offset = 1,tl.srt = 45,tl.cex=0.6,addCoefasPercent=TRUE)
+
+apply(Z, 2,mean)
+apply(Z, 2,sd)
+}
